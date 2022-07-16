@@ -12,15 +12,19 @@ library(xts) #as.xts
 data <- readRDS("data.rds")
 df <- as.data.frame(data)
 
-for(i in 1:1461){
-  if(is.nan(df$Usage[i])){
-    a <- 1
-    while(is.nan(df$Usage[i+a])){
-      a <- a + 1
-    }
-    print(df$Usage[i])
-    df$Usage[i] <- (df$Usage[i-1] + df$Usage[i+a])/2
-    print(df$Usage[i])
-  }
-}
+#for(i in 1:1461){
+#  if(is.nan(df$Usage[i])){
+#    a <- 1
+#    while(is.nan(df$Usage[i+a])){
+#      a <- a + 1
+#    }
+#    print(df$Usage[i])
+#    df$Usage[i] <- (df$Usage[i-1] + df$Usage[i+a])/2
+#    print(df$Usage[i])
+#  }
+#}
+#time <- seq(as.Date("2017-01-01"),length = 365*4+1,by = "days")
+#data <- xts(df$Usage,order.by = time)
+#colnames(data) <- c("Usage")
+#saveRDS(data,"data.rds")
 
