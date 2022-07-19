@@ -10,21 +10,55 @@ library(lubridate) #提取月份
 library(xts) #as.xts
 
 data <- readRDS("data.rds")
-df <- as.data.frame(data)
+ 
+data_ex <- as.data.frame(subset(data$Usage,index(data) < "2019-01-01"))
+data_control <- as.data.frame(subset(data$Usage,index(data) >= "2019-01-01"))
 
-#for(i in 1:1461){
-#  if(is.nan(df$Usage[i])){
-#    a <- 1
-#    while(is.nan(df$Usage[i+a])){
-#      a <- a + 1
-#    }
-#    print(df$Usage[i])
-#    df$Usage[i] <- (df$Usage[i-1] + df$Usage[i+a])/2
-#    print(df$Usage[i])
-#  }
-#}
-#time <- seq(as.Date("2017-01-01"),length = 365*4+1,by = "days")
-#data <- xts(df$Usage,order.by = time)
-#colnames(data) <- c("Usage")
-#saveRDS(data,"data.rds")
 
+data_ts1 <- ts(data_ex$Usage,start = min(index(data_ex),end = max(index(data_ex))),frequency = 7)
+
+
+#拆解 <- decompose(data_ts1)
+#plot(拆解)
+
+adf.test(data_ts1) 
+#因為非stationary，故要進行lambda轉換(轉換後還是不穩定，後來使用轉換又差分的方式)
+lambda轉換 <- BoxCox(data_ts1,lambda = "auto")
+#轉換值
+BoxCox.lambda(lambda轉換) #0.7053499
+#差分且轉換就過了(p-value < 0.05)
+#有足夠的證據去推翻不穩定的假設
+差分且轉換 <- diff(BoxCox(data_ts1,lambda = "auto"),differences = 1)
+adf.test(差分且轉換)
+
+
+#建模
+#order(AR,I,MA)(S)
+#SARI模型
+auto.arima(lambda轉換,stepwise = F,trace = T,stationary = T,ic = c("aic"))
+fit <- arima(lambda轉換,order = c(1,1,0),seasonal = list(order = c(2,0,0),period = 7),include.mean = FALSE) #SARMA
+
+
+#模型檢查
+tsdisplay(residuals(fit),lag.max = 50,main = '殘差')
+#不符合常態分布
+#https://officeguide.cc/r-normality-test-tutorial/
+shapiro.test(fit$residuals)
+#顯著性值少於 0.05 表示殘差誤不是隨機的，暗示在觀察數列中有模型未說明的結構。
+#https://www.ibm.com/docs/zh-tw/spss-modeler/SaaS?topic=node-examining-model
+Box.test(fit$residuals,lag = 14,type = "Ljung-Box")
+
+
+#預測誤差及討論空間
+#lambda填上lambda轉換次數+1
+p <- forecast(fit,100,lambda = 0.7053499)
+p
+plot(p)
+
+預測 <- as.data.frame(p)
+評估 <- cbind(p,data_control[-c(425),])
+colnames(評估) <- c("test","Usage")
+評估 <- 評估 %>%
+  mutate(mae = abs(Usage - 評估$`Point Forecast`)) %>%
+  mutate(mape = abs(Usage - 評估$`Point Forecast`)/Usage)
+mean(評估)  
